@@ -9,7 +9,7 @@ from typing import Dict, List, Tuple
 import pytest
 
 from bottleneck_tsp import prim_mst, solve_bottleneck_tsp
-from tests.helpers import random_metric_matrix
+from generator import generate_euclidean
 
 
 def _median_time_seconds(func, repeats: int = 5) -> float:
@@ -22,7 +22,7 @@ def _median_time_seconds(func, repeats: int = 5) -> float:
 
 
 def _time_prim(n: int, repeats: int = 5) -> float:
-    W = random_metric_matrix(n, seed=9000 + n)
+    W, _ = generate_euclidean(n, seed=9000 + n)
 
     def run():
         prim_mst(n, W)
@@ -31,7 +31,7 @@ def _time_prim(n: int, repeats: int = 5) -> float:
 
 
 def _time_full_solver(n: int, repeats: int = 5) -> float:
-    W = random_metric_matrix(n, seed=8000 + n)
+    W, _ = generate_euclidean(n, seed=8000 + n)
 
     def run():
         solve_bottleneck_tsp(n, W)

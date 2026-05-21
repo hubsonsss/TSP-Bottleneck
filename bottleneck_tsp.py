@@ -135,9 +135,9 @@ def find_path_recursive(adj, vertices, start, end):
 
 def solve_bottleneck_tsp(n, W):
     if n == 1:
-        return [0, 0], 0
+        return [0, 0], 0, []
     if n == 2:
-        return [0, 1, 0], W[0][1]
+        return [0, 1, 0], W[0][1], [(0, 1)]
 
     parent = prim_mst(n, W)
     adj = build_adjacency(parent, n)
@@ -165,64 +165,6 @@ def save_to_file(filepath, cycle, bottleneck):
         f.write(f"Bottleneck (najcięższa krawędź): {bottleneck}\n")
         f.write("Cykl Hamiltona:\n")
         f.write(" -> ".join(str(v) for v in cycle) + "\n")
-
-# Wizualizacja
-
-def visualize(n, W, cycle, mst_edges):
-    import matplotlib.pyplot as plt
-    import numpy as np
-
-
-    angles = np.linspace(0, 2 * np.pi, n, endpoint=False)
-    x = np.cos(angles)
-    y = np.sin(angles)
-
-    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
-
-    ax1 = axes[0]
-    ax1.set_title("Minimalne Drzewo Rozpinające (MST)")
-    for u, v in mst_edges:
-        ax1.plot([x[u], x[v]], [y[u], y[v]], 'b-', linewidth=1.5)
-        mid_x, mid_y = (x[u] + x[v]) / 2, (y[u] + y[v]) / 2
-        ax1.text(mid_x, mid_y, f"{W[u][v]:.0f}", fontsize=8, ha='center',
-                 bbox=dict(boxstyle='round,pad=0.2', facecolor='white', alpha=0.8))
-    ax1.scatter(x, y, s=200, c='lightblue', edgecolors='black', zorder=5)
-    for i in range(n):
-        ax1.text(x[i], y[i], str(i), fontsize=10, ha='center', va='center', zorder=6)
-    ax1.set_aspect('equal')
-    ax1.grid(True, alpha=0.3)
-
-    ax2 = axes[1]
-    ax2.set_title("Cykl Hamiltona (Bottleneck TSP)")
-
-    bottleneck = 0
-    bottleneck_edge = (0, 0)
-    for i in range(len(cycle) - 1):
-        w = W[cycle[i]][cycle[i + 1]]
-        if w > bottleneck:
-            bottleneck = w
-            bottleneck_edge = (cycle[i], cycle[i + 1])
-
-    for i in range(len(cycle) - 1):
-        u_idx, v_idx = cycle[i], cycle[i + 1]
-        is_bottleneck = (u_idx == bottleneck_edge[0] and v_idx == bottleneck_edge[1])
-        color = 'red' if is_bottleneck else 'green'
-        lw = 3 if is_bottleneck else 1.5
-        ax2.plot([x[u_idx], x[v_idx]], [y[u_idx], y[v_idx]], color=color, linewidth=lw)
-        mid_x, mid_y = (x[u_idx] + x[v_idx]) / 2, (y[u_idx] + y[v_idx]) / 2
-        ax2.text(mid_x, mid_y, f"{W[u_idx][v_idx]:.0f}", fontsize=8, ha='center',
-                 bbox=dict(boxstyle='round,pad=0.2', facecolor='white', alpha=0.8))
-
-    ax2.scatter(x, y, s=200, c='lightgreen', edgecolors='black', zorder=5)
-    for i in range(n):
-        ax2.text(x[i], y[i], str(i), fontsize=10, ha='center', va='center', zorder=6)
-    ax2.set_aspect('equal')
-    ax2.grid(True, alpha=0.3)
-
-    plt.suptitle(f"Bottleneck TSP — najcięższa krawędź: {bottleneck}", fontsize=13)
-    plt.tight_layout()
-    plt.show()
-
 
 # Main
 
@@ -259,6 +201,7 @@ def main():
     print(f"Wynik zapisano do: {output_file}")
 
     if viz_mode:
+        from plots import visualize
         visualize(n, W, cycle, mst_edges)
 
 

@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from benchmark import brute_force_bottleneck_tsp
 from bottleneck_tsp import (
     build_adjacency,
     find_path_recursive,
@@ -16,13 +17,12 @@ from bottleneck_tsp import (
     prim_mst,
     solve_bottleneck_tsp,
 )
+from generator import generate_euclidean
 from tests.helpers import (
-    brute_force_optimal_bottleneck,
     cycle_bottleneck,
     doc_example_matrix,
     is_hamiltonian_cycle,
     mst_max_edge_weight,
-    random_metric_matrix,
     satisfies_triangle_inequality,
     solve,
     validate_weight_matrix,
@@ -52,7 +52,7 @@ class TestInputOutput:
 class TestPrimMST:
     @pytest.mark.parametrize("n", [1, 2, 3, 4, 5, 8, 12])
     def test_mst_has_n_minus_one_edges(self, n: int):
-        W = random_metric_matrix(n, seed=n)
+        W, _ = generate_euclidean(n, seed=n)
         parent = prim_mst(n, W)
         edges = get_mst_edges(parent, n)
         if n == 1:
@@ -62,7 +62,7 @@ class TestPrimMST:
 
     @pytest.mark.parametrize("n", [3, 4, 6, 10])
     def test_mst_is_connected_tree(self, n: int):
-        W = random_metric_matrix(n, seed=100 + n)
+        W, _ = generate_euclidean(n, seed=100 + n)
         parent = prim_mst(n, W)
         adj = build_adjacency(parent, n)
         for v in range(1, n):
@@ -75,7 +75,7 @@ class TestPrimMST:
 class TestHamiltonianCycle:
     @pytest.mark.parametrize("n", [3, 4, 5, 6, 8, 10, 15])
     def test_solution_is_valid_hamiltonian_cycle(self, n: int):
-        W = random_metric_matrix(n, seed=200 + n)
+        W, _ = generate_euclidean(n, seed=200 + n)
         cycle, bottleneck, *_ = solve_bottleneck_tsp(n, W)
         assert is_hamiltonian_cycle(cycle, n)
         assert bottleneck == pytest.approx(cycle_bottleneck(cycle, W))
@@ -86,13 +86,13 @@ class TestHamiltonianCycle:
         assert reported == pytest.approx(cycle_bottleneck(cycle, W))
 
     def test_single_vertex(self):
-        cycle, b = solve_bottleneck_tsp(1, [[0]])
+        cycle, b, _ = solve_bottleneck_tsp(1, [[0]])
         assert cycle == [0, 0]
         assert b == 0
 
     def test_two_vertices(self):
         W = [[0, 7], [7, 0]]
-        cycle, b = solve_bottleneck_tsp(2, W)
+        cycle, b, _ = solve_bottleneck_tsp(2, W)
         assert is_hamiltonian_cycle(cycle, 2)
         assert b == 7
 
@@ -102,30 +102,30 @@ class TestThreeApproximation:
 
     @pytest.mark.parametrize("n", range(3, 9))
     def test_bottleneck_at_most_three_times_optimal(self, n: int):
-        W = random_metric_matrix(n, seed=300 + n)
-        opt, _ = brute_force_optimal_bottleneck(n, W)
+        W, _ = generate_euclidean(n, seed=300 + n)
+        _, opt = brute_force_bottleneck_tsp(n, W)
         cycle, approx, *_ = solve_bottleneck_tsp(n, W)
         assert cycle_bottleneck(cycle, W) == approx
         assert approx <= 3.0 * opt + 1e-9
 
     def test_doc_example_within_factor_three(self):
         W = doc_example_matrix()
-        opt, _ = brute_force_optimal_bottleneck(4, W)
+        _, opt = brute_force_bottleneck_tsp(4, W)
         assert opt == pytest.approx(4)
         _, approx, _ = solve_bottleneck_tsp(4, W)
         assert approx <= 3 * opt
 
     @pytest.mark.parametrize("n", range(3, 9))
     def test_mst_heaviest_edge_not_greater_than_optimal(self, n: int):
-        W = random_metric_matrix(n, seed=400 + n)
-        opt, _ = brute_force_optimal_bottleneck(n, W)
+        W, _ = generate_euclidean(n, seed=400 + n)
+        _, opt = brute_force_bottleneck_tsp(n, W)
         parent = prim_mst(n, W)
         mst_max = mst_max_edge_weight(parent, W)
         assert mst_max <= opt + 1e-9
 
     @pytest.mark.parametrize("n", range(3, 9))
     def test_solution_bottleneck_at_most_three_times_mst_max(self, n: int):
-        W = random_metric_matrix(n, seed=500 + n)
+        W, _ = generate_euclidean(n, seed=500 + n)
         result = solve(n, W)
         assert result["bottleneck"] <= 3.0 * result["mst_max"] + 1e-9
 
