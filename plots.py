@@ -11,6 +11,9 @@ import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 
+from bottleneck_tsp import load_from_file, solve_bottleneck_tsp, get_mst_edges, prim_mst
+from generator import generate_euclidean
+
 
 def load_timing_results(filepath):
     """Wczytuje wyniki pomiarów czasowych z CSV."""
@@ -28,22 +31,6 @@ def load_timing_results(filepath):
             data[n].append(t)
     return data
 
-
-def load_quality_results(filepath):
-    """Wczytuje wyniki analizy jakości z CSV."""
-    data = []
-    with open(filepath, 'r', encoding='utf-8') as f:
-        header = f.readline()
-        for line in f:
-            parts = line.strip().split(',')
-            if len(parts) < 5:
-                continue
-            n = int(parts[0])
-            optimal = float(parts[2])
-            approx = float(parts[3])
-            ratio = float(parts[4])
-            data.append({'n': n, 'optimal': optimal, 'approx': approx, 'ratio': ratio})
-    return data
 
 
 def plot_time_complexity(timing_data, out_dir):
@@ -106,70 +93,6 @@ def plot_time_loglog(timing_data, out_dir):
     plt.close(fig)
     print(f"Zapisano: {filepath}")
 
-
-def plot_approximation_quality(quality_data, out_dir):
-    """Wykres: jakość aproksymacji (ratio) dla małych instancji."""
-    if not quality_data:
-        print("Brak danych jakości, pomijam wykres approximation_quality")
-        return
-
-    ns = [d['n'] for d in quality_data]
-    ratios = [d['ratio'] for d in quality_data]
-
-    fig, ax = plt.subplots(figsize=(10, 6))
-    ax.scatter(range(len(ratios)), ratios, c='blue', s=40, alpha=0.7, label='Zmierzone ratio')
-    ax.axhline(y=1.0, color='green', linestyle='--', linewidth=1.5, label='Optimum (ratio=1.0)')
-    ax.axhline(y=3.0, color='red', linestyle='--', linewidth=1.5, label='Gwarancja teoretyczna (ratio=3.0)')
-
-    unique_ns = sorted(set(ns))
-    tick_positions = []
-    tick_labels = []
-    for un in unique_ns:
-        indices = [i for i, n in enumerate(ns) if n == un]
-        mid = indices[len(indices) // 2]
-        tick_positions.append(mid)
-        tick_labels.append(f'n={un}')
-    ax.set_xticks(tick_positions)
-    ax.set_xticklabels(tick_labels)
-
-    ax.set_xlabel('Instancje testowe', fontsize=12)
-    ax.set_ylabel('Współczynnik aproksymacji (approx / optimal)', fontsize=12)
-    ax.set_title('Jakość 3-aproksymacji Bottleneck TSP', fontsize=14)
-    ax.legend(fontsize=11)
-    ax.grid(True, alpha=0.3)
-    ax.set_ylim(0.5, 3.5)
-
-    filepath = os.path.join(out_dir, 'approximation_quality.png')
-    fig.savefig(filepath, dpi=150, bbox_inches='tight')
-    plt.close(fig)
-    print(f"Zapisano: {filepath}")
-
-
-def plot_ratio_histogram(quality_data, out_dir):
-    """Histogram rozkładu współczynnika aproksymacji."""
-    if not quality_data:
-        print("Brak danych jakości, pomijam histogram")
-        return
-
-    ratios = [d['ratio'] for d in quality_data]
-
-    fig, ax = plt.subplots(figsize=(10, 6))
-    ax.hist(ratios, bins=20, color='steelblue', edgecolor='black', alpha=0.8)
-    ax.axvline(x=1.0, color='green', linestyle='--', linewidth=2, label='Optimum (1.0)')
-    ax.axvline(x=3.0, color='red', linestyle='--', linewidth=2, label='Gwarancja (3.0)')
-    ax.axvline(x=np.mean(ratios), color='orange', linestyle='-', linewidth=2,
-               label=f'Średnia ({np.mean(ratios):.2f})')
-
-    ax.set_xlabel('Współczynnik aproksymacji', fontsize=12)
-    ax.set_ylabel('Liczba instancji', fontsize=12)
-    ax.set_title('Rozkład współczynnika aproksymacji Bottleneck TSP', fontsize=14)
-    ax.legend(fontsize=11)
-    ax.grid(True, alpha=0.3)
-
-    filepath = os.path.join(out_dir, 'ratio_histogram.png')
-    fig.savefig(filepath, dpi=150, bbox_inches='tight')
-    plt.close(fig)
-    print(f"Zapisano: {filepath}")
 
 
 def load_comparison_results(filepath):
@@ -240,29 +163,6 @@ def plot_comparison_time_log(comp_data, out_dir):
     print(f"Zapisano: {filepath}")
 
 
-def plot_comparison_bottleneck(comp_data, out_dir):
-    """Wykres porównawczy wartości bottleneck."""
-    sizes = sorted(comp_data.keys())
-    mean_approx = [np.mean(comp_data[n]['approx']) for n in sizes]
-    mean_optimal = [np.mean(comp_data[n]['optimal']) for n in sizes]
-
-    x = np.array(sizes)
-    width = 0.35
-    fig, ax = plt.subplots(figsize=(10, 6))
-    ax.bar(x - width / 2, mean_optimal, width, color='green', alpha=0.8, label='Optimum (brute force)')
-    ax.bar(x + width / 2, mean_approx, width, color='orange', alpha=0.8, label='3-aproksymacja')
-    ax.set_xlabel('Liczba wierzchołków (n)', fontsize=12)
-    ax.set_ylabel('Średnia wartość bottleneck', fontsize=12)
-    ax.set_title('Porównanie wartości bottleneck: aproksymacja vs optimum', fontsize=14)
-    ax.legend(fontsize=11)
-    ax.grid(True, alpha=0.3, axis='y')
-    ax.set_xticks(sizes)
-
-    filepath = os.path.join(out_dir, 'comparison_bottleneck.png')
-    fig.savefig(filepath, dpi=150, bbox_inches='tight')
-    plt.close(fig)
-    print(f"Zapisano: {filepath}")
-
 
 def plot_comparison_ratio(comp_data, out_dir):
     """Wykres współczynnika aproksymacji z porównania."""
@@ -291,7 +191,6 @@ def plot_comparison_ratio(comp_data, out_dir):
 
 
 def _draw_edges_on_ax(ax, x, y, W, edges, title, node_color, highlight_heaviest=True):
-    """Rysuje krawędzie na axie z wyróżnieniem najcięższej."""
     n = len(x)
 
     heaviest = 0
@@ -324,12 +223,10 @@ def _draw_edges_on_ax(ax, x, y, W, edges, title, node_color, highlight_heaviest=
 
 
 def _cycle_to_edges(cycle):
-    """Konwertuje cykl [v0, v1, ..., v0] na listę krawędzi [(v0,v1), ...]."""
     return [(cycle[i], cycle[i + 1]) for i in range(len(cycle) - 1)]
 
 
 def visualize(n, W, cycle, mst_edges):
-    """Wizualizacja MST i cyklu Hamiltona (układ kołowy, plt.show)."""
     angles = np.linspace(0, 2 * np.pi, n, endpoint=False)
     x = np.cos(angles)
     y = np.sin(angles)
@@ -365,13 +262,10 @@ def plot_routes(out_dir, instances=None):
         px = points[:, 0]
         py = points[:, 1]
 
-        # Aproksymacja
         approx_cycle, approx_bn, _ = solve_bottleneck_tsp(n, W)
 
-        # Brute force
         bf_cycle, bf_bn = brute_force_bottleneck_tsp(n, W)
 
-        # Rysuj
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
 
         _draw_edges_on_ax(ax1, px, py, W, _cycle_to_edges(bf_cycle),
@@ -389,6 +283,36 @@ def plot_routes(out_dir, instances=None):
         print(f"Zapisano: {filepath}")
 
 
+def plot_instance_from_file(filepath, out_dir, seed=None):
+    n, W = load_from_file(filepath)
+    sys.setrecursionlimit(max(2000, 3 * n))
+
+    cycle, bottleneck, mst_edges = solve_bottleneck_tsp(n, W)
+
+    if seed is not None:
+        _, points = generate_euclidean(n, seed=seed)
+        px, py = points[:, 0], points[:, 1]
+    else:
+        angles = np.linspace(0, 2 * np.pi, n, endpoint=False)
+        px, py = np.cos(angles), np.sin(angles)
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
+
+    _draw_edges_on_ax(ax1, px, py, W, mst_edges,
+                      "MST (Prim)", 'lightblue', highlight_heaviest=False)
+    _draw_edges_on_ax(ax2, px, py, W, _cycle_to_edges(cycle),
+                      "3-aproksymacja", 'lightgreen')
+
+    basename = os.path.splitext(os.path.basename(filepath))[0]
+    fig.suptitle(f"Bottleneck TSP — n={n}, bottleneck = {bottleneck:.0f}", fontsize=14)
+    plt.tight_layout()
+
+    out_path = os.path.join(out_dir, f'{basename}.png')
+    fig.savefig(out_path, dpi=150, bbox_inches='tight')
+    plt.close(fig)
+    print(f"Zapisano: {out_path}")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Generowanie wykresów Bottleneck TSP")
     parser.add_argument('--results-dir', type=str, default='results', help="Katalog z wynikami benchmarków")
@@ -397,12 +321,15 @@ def main():
                         help="Generuj wykresy tras (aproksymacja vs brute force)")
     parser.add_argument('--route-sizes', type=str, default='6,8,10',
                         help="Rozmiary instancji do wykresów tras (rozdzielone przecinkami)")
+    parser.add_argument('--files', nargs='+',
+                        help="Pliki wejsciowe do wizualizacji (MST + cykl aproksymacji)")
+    parser.add_argument('--seed', type=int, default=None,
+                        help="Seed generatora (do odtworzenia wspolrzednych 2D)")
     args = parser.parse_args()
 
     os.makedirs(args.out_dir, exist_ok=True)
 
     timing_path = os.path.join(args.results_dir, 'timing_results.csv')
-    quality_path = os.path.join(args.results_dir, 'quality_results.csv')
     comparison_path = os.path.join(args.results_dir, 'comparison_results.csv')
 
     if os.path.exists(timing_path):
@@ -412,18 +339,10 @@ def main():
     else:
         print(f"Brak pliku: {timing_path}")
 
-    if os.path.exists(quality_path):
-        quality_data = load_quality_results(quality_path)
-        plot_approximation_quality(quality_data, args.out_dir)
-        plot_ratio_histogram(quality_data, args.out_dir)
-    else:
-        print(f"Brak pliku: {quality_path}")
-
     if os.path.exists(comparison_path):
         comp_data = load_comparison_results(comparison_path)
         plot_comparison_time(comp_data, args.out_dir)
         plot_comparison_time_log(comp_data, args.out_dir)
-        plot_comparison_bottleneck(comp_data, args.out_dir)
         plot_comparison_ratio(comp_data, args.out_dir)
     else:
         print(f"Brak pliku: {comparison_path}")
@@ -431,6 +350,20 @@ def main():
     if args.routes:
         route_sizes = [int(s) for s in args.route_sizes.split(',')]
         plot_routes(args.out_dir, instances=route_sizes)
+
+    if args.files:
+        for fp in args.files:
+            if not os.path.exists(fp):
+                print(f"Brak pliku: {fp}")
+                continue
+            file_seed = None
+            if args.seed is not None:
+                base = os.path.splitext(os.path.basename(fp))[0]
+                parts = base.replace('test_n', '').split('_')
+                if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
+                    size, idx = int(parts[0]), int(parts[1])
+                    file_seed = args.seed * 10000 + size * 100 + idx
+            plot_instance_from_file(fp, args.out_dir, seed=file_seed)
 
 
 if __name__ == '__main__':

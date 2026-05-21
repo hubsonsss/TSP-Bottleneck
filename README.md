@@ -108,14 +108,9 @@ Zlozonosc czasowa:
 - `time_complexity.png` - czas vs krzywa c*n^3
 - `time_loglog.png` - zlozonosc w skali log-log
 
-Jakosc aproksymacji:
-- `approximation_quality.png` - jakosc aproksymacji
-- `ratio_histogram.png` - histogram wspolczynnika aproksymacji
-
 Porownanie z brute force:
 - `comparison_time.png` - porownanie czasow: aproksymacja vs brute force
 - `comparison_time_log.png` - j.w. w skali logarytmicznej
-- `comparison_bottleneck.png` - porownanie wartosci bottleneck
 - `comparison_ratio.png` - wspolczynnik aproksymacji
 
 Wizualizacja tras (flaga `--routes`):
